@@ -72,8 +72,12 @@ class NudgeRepository(
         onDataChanged()
     }
 
-    suspend fun archiveMedicine(id: Long) {
-        medDao.get(id)?.let { medDao.update(it.copy(archivedEpochDay = LocalDate.now().toEpochDay())) }
+    suspend fun archiveMedicine(id: Long) = archiveMedicines(listOf(id))
+
+    /** "Delete": hides the medicines from today on, but keeps them so history stays correct. */
+    suspend fun archiveMedicines(ids: Collection<Long>) {
+        val today = LocalDate.now().toEpochDay()
+        ids.forEach { id -> medDao.get(id)?.let { medDao.update(it.copy(archivedEpochDay = today)) } }
         onDataChanged()
     }
 
