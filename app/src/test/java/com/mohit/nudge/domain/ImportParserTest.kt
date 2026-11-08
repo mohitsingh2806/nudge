@@ -68,6 +68,21 @@ class ImportParserTest {
             ImportParser.parseSlots("before breakfast + after dinner"),
         )
         assertEquals(ImportParser.Parsed.Ok(21 to 0), ImportParser.parseRepeat("every 3 weeks"))
+    }
+
+    @Test
+    fun foodIndependentTimesUseAfterFoodSlot() {
+        fun slots(s: String) = (ImportParser.parseSlots(s) as ImportParser.Parsed.Ok).value
+        assertEquals(setOf(Slot.MORNING_AFTER), slots("ANY"))
+        assertEquals(setOf(Slot.MORNING_AFTER), slots("once daily"))
+        assertEquals(setOf(Slot.MORNING_AFTER), slots("morning"))
+        assertEquals(setOf(Slot.NOON_AFTER), slots("afternoon"))
+        assertEquals(setOf(Slot.NIGHT_AFTER), slots("bedtime"))
+        assertEquals(setOf(Slot.NIGHT_AFTER), slots("HS"))
+        assertEquals(setOf(Slot.MORNING_AFTER, Slot.NIGHT_AFTER), slots("morning + night"))
+        // explicit food words still win
+        assertEquals(setOf(Slot.NIGHT_BEFORE), slots("before dinner"))
+        assertEquals(setOf(Slot.MORNING_BEFORE), slots("empty stomach"))
         assertEquals(ImportParser.Parsed.Ok(30), ImportParser.parseDays("1 month"))
         assertEquals(ImportParser.Parsed.Ok(null), ImportParser.parseDays(""))
     }

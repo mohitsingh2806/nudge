@@ -25,7 +25,12 @@ object ImportParser {
           BB = before breakfast, AB = after breakfast
           BL = before lunch,     AL = after lunch
           BD = before dinner,    AD = after dinner
+          ANY = once a day, any time (taken in the morning)
           ("empty stomach" in the morning = BB, "with food" = after. 1-0-1 means morning and night.)
+          If food timing is not mentioned or doesn't matter: morning = AB, afternoon = AL,
+          night / bedtime = AD, once daily = ANY. Do NOT write ?? just because food timing is missing.
+          Do NOT copy prescription abbreviations: on prescriptions OD = once daily, BD/BID = twice daily
+          (use AB+AD), TDS/TID = three times daily (use AB+AL+AD), HS = bedtime (use AD).
         How often = daily, alternate days, every N days, weekly, or weekday names like Mon Thu
         Days = how many days to take it (e.g. 5, 2 weeks, 1 month) or ongoing
 
@@ -93,6 +98,9 @@ object ImportParser {
         "bb" to Slot.MORNING_BEFORE, "ab" to Slot.MORNING_AFTER,
         "bl" to Slot.NOON_BEFORE, "al" to Slot.NOON_AFTER,
         "bd" to Slot.NIGHT_BEFORE, "ad" to Slot.NIGHT_AFTER,
+        // Food timing doesn't matter: once a day, morning.
+        "any" to Slot.MORNING_AFTER, "anytime" to Slot.MORNING_AFTER,
+        "hs" to Slot.NIGHT_AFTER,
     )
 
     fun parseSlots(s: String): Parsed<Set<Slot>> {
@@ -107,20 +115,26 @@ object ImportParser {
         return Parsed.Ok(slots)
     }
 
+    /**
+     * "before breakfast", "after dinner", "empty stomach" …
+     * With no food word ("morning", "night", "bedtime"), food doesn't matter, so the
+     * after-food slot for that time of day is used. "once daily" / "any time" = morning.
+     */
     private fun slotFromPhrase(p: String): Slot? {
         val timing = when {
             "before" in p || "empty" in p -> Timing.BEFORE
             "after" in p || "with food" in p -> Timing.AFTER
-            else -> return null
+            else -> null
         }
         val meal = when {
             "breakfast" in p || "morning" in p -> Meal.BREAKFAST
             "lunch" in p || "noon" in p || "afternoon" in p -> Meal.LUNCH
             "dinner" in p || "night" in p || "evening" in p || "bed" in p -> Meal.DINNER
             "empty" in p -> Meal.BREAKFAST
+            timing == null && ("once" in p || "any" in p || "daily" in p) -> return Slot.MORNING_AFTER
             else -> return null
         }
-        return Slot.of(meal, timing)
+        return Slot.of(meal, timing ?: Timing.AFTER)
     }
 
     private val dayNames = mapOf(
