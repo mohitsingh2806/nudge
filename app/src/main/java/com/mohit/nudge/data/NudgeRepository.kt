@@ -66,6 +66,12 @@ class NudgeRepository(
         onDataChanged()
     }
 
+    suspend fun addMedicines(medicines: List<Medicine>) {
+        if (medicines.isEmpty()) return
+        medDao.insertAll(medicines)
+        onDataChanged()
+    }
+
     suspend fun archiveMedicine(id: Long) {
         medDao.get(id)?.let { medDao.update(it.copy(archivedEpochDay = LocalDate.now().toEpochDay())) }
         onDataChanged()

@@ -24,6 +24,7 @@ import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.mohit.nudge.ui.history.HistoryScreen
 import com.mohit.nudge.ui.medicines.EditMedicineScreen
+import com.mohit.nudge.ui.medicines.ImportScreen
 import com.mohit.nudge.ui.medicines.MedicinesScreen
 import com.mohit.nudge.ui.settings.SettingsScreen
 import com.mohit.nudge.ui.today.TodayScreen
@@ -68,8 +69,19 @@ fun NudgeAppUi() {
             startDestination = Tab.TODAY.route,
             modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
         ) {
-            composable(Tab.TODAY.route) { TodayScreen(onAddMedicine = { nav.navigate("edit/0") }) }
-            composable(Tab.MEDICINES.route) { MedicinesScreen(onEdit = { id -> nav.navigate("edit/$id") }) }
+            composable(Tab.TODAY.route) {
+                TodayScreen(
+                    onAddMedicine = { nav.navigate("edit/0") },
+                    onImport = { nav.navigate("import") },
+                )
+            }
+            composable(Tab.MEDICINES.route) {
+                MedicinesScreen(
+                    onEdit = { id -> nav.navigate("edit/$id") },
+                    onImport = { nav.navigate("import") },
+                )
+            }
+            composable("import") { ImportScreen(onDone = { nav.popBackStack() }) }
             composable(Tab.HISTORY.route) { HistoryScreen() }
             composable(Tab.SETTINGS.route) { SettingsScreen() }
             composable(

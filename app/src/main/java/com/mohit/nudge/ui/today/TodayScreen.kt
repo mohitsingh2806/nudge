@@ -94,7 +94,7 @@ class TodayViewModel(private val repo: NudgeRepository) : ViewModel() {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen(onAddMedicine: () -> Unit) {
+fun TodayScreen(onAddMedicine: () -> Unit, onImport: () -> Unit) {
     val context = LocalContext.current
     val vm: TodayViewModel = viewModel { TodayViewModel(context.container.repo) }
     val state by vm.state.collectAsStateWithLifecycle()
@@ -120,7 +120,7 @@ fun TodayScreen(onAddMedicine: () -> Unit) {
             val s = state
             when {
                 s == null -> CircularProgressIndicator(Modifier.align(Alignment.Center))
-                !s.hasMedicines -> EmptyToday(onAddMedicine, Modifier.align(Alignment.Center))
+                !s.hasMedicines -> EmptyToday(onAddMedicine, onImport, Modifier.align(Alignment.Center))
                 else -> TodayContent(s, vm)
             }
         }
@@ -128,7 +128,7 @@ fun TodayScreen(onAddMedicine: () -> Unit) {
 }
 
 @Composable
-private fun EmptyToday(onAddMedicine: () -> Unit, modifier: Modifier = Modifier) {
+private fun EmptyToday(onAddMedicine: () -> Unit, onImport: () -> Unit, modifier: Modifier = Modifier) {
     Column(modifier.padding(32.dp), horizontalAlignment = Alignment.CenterHorizontally) {
         Text("No medicines yet", style = MaterialTheme.typography.titleLarge)
         Spacer(Modifier.height(8.dp))
@@ -139,6 +139,7 @@ private fun EmptyToday(onAddMedicine: () -> Unit, modifier: Modifier = Modifier)
         )
         Spacer(Modifier.height(16.dp))
         Button(onClick = onAddMedicine) { Text("Add medicine") }
+        TextButton(onClick = onImport) { Text("Have many? Import from prescription") }
     }
 }
 

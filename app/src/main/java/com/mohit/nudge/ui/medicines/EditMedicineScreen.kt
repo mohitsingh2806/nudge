@@ -1,5 +1,6 @@
 package com.mohit.nudge.ui.medicines
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -49,6 +50,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -182,6 +184,24 @@ class EditMedicineViewModel(private val repo: NudgeRepository, private val id: L
         }
     }
 
+    /** Saves, then clears the form for the next medicine (keeps start date and duration). */
+    fun saveAndAddAnother(onSaved: (String) -> Unit) {
+        if (!canSave) return
+        val m = draft()
+        viewModelScope.launch {
+            repo.saveMedicine(m)
+            name = ""
+            dose = ""
+            notes = ""
+            slots = emptySet()
+            repeat = RepeatType.DAILY
+            interval = "2"
+            weekdays = emptySet()
+            color = PillColors[(PillColors.indexOf(color) + 1) % PillColors.size]
+            onSaved(m.name)
+        }
+    }
+
     fun delete(onDone: () -> Unit) {
         viewModelScope.launch {
             repo.archiveMedicine(id)
@@ -193,8 +213,11 @@ class EditMedicineViewModel(private val repo: NudgeRepository, private val id: L
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EditMedicineScreen(id: Long, onDone: () -> Unit) {
-    val c = LocalContext.current.container
+    val context = LocalContext.current
+    val c = context.container
     val vm: EditMedicineViewModel = viewModel { EditMedicineViewModel(c.repo, id) }
+    val scrollState = rememberScrollState()
+    val scope = rememberCoroutineScope()
     val settings by c.settings.flow.collectAsStateWithLifecycle(initialValue = NudgeSettings())
     var showDatePicker by remember { mutableStateOf(false) }
     var confirmDelete by remember { mutableStateOf(false) }
@@ -230,7 +253,7 @@ fun EditMedicineScreen(id: Long, onDone: () -> Unit) {
                 .padding(padding)
                 .fillMaxSize()
                 .imePadding()
-                .verticalScroll(rememberScrollState())
+                .verticalScroll(scrollState)
                 .padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp),
         ) {
@@ -320,6 +343,18 @@ fun EditMedicineScreen(id: Long, onDone: () -> Unit) {
                 enabled = vm.canSave,
                 modifier = Modifier.fillMaxWidth().height(56.dp),
             ) { Text("Save") }
+            if (id == 0L) {
+                OutlinedButton(
+                    onClick = {
+                        vm.saveAndAddAnother { saved ->
+                            Toast.makeText(context, "Saved $saved — add the next one", Toast.LENGTH_SHORT).show()
+                            scope.launch { scrollState.animateScrollTo(0) }
+                        }
+                    },
+                    enabled = vm.canSave,
+                    modifier = Modifier.fillMaxWidth().height(56.dp),
+                ) { Text("Save & add another") }
+            }
             Spacer(Modifier.height(24.dp))
         }
     }

@@ -28,6 +28,9 @@ interface MedicineDao {
     @Insert
     suspend fun insert(medicine: Medicine): Long
 
+    @Insert
+    suspend fun insertAll(medicines: List<Medicine>)
+
     @Update
     suspend fun update(medicine: Medicine)
 }

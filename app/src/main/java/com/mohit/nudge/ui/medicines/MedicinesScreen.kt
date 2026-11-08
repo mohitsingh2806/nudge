@@ -16,6 +16,7 @@ import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -36,13 +37,18 @@ import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun MedicinesScreen(onEdit: (Long) -> Unit) {
+fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
     val repo = LocalContext.current.container.repo
     val meds by repo.activeMedicines.collectAsStateWithLifecycle(initialValue = emptyList())
 
     Scaffold(
         contentWindowInsets = NoInsets,
-        topBar = { TopAppBar(title = { Text("Medicines") }) },
+        topBar = {
+            TopAppBar(
+                title = { Text("Medicines") },
+                actions = { TextButton(onClick = onImport) { Text("Import list") } },
+            )
+        },
         floatingActionButton = {
             ExtendedFloatingActionButton(
                 onClick = { onEdit(0L) },
@@ -54,7 +60,7 @@ fun MedicinesScreen(onEdit: (Long) -> Unit) {
         if (meds.isEmpty()) {
             Box(Modifier.padding(padding).fillMaxSize(), contentAlignment = Alignment.Center) {
                 Text(
-                    "No medicines yet.\nTap Add to create one.",
+                    "No medicines yet.\nTap Add, or Import list to add many at once.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
