@@ -19,7 +19,10 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
+import androidx.compose.material3.DatePicker
+import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -29,8 +32,10 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -52,7 +57,10 @@ import com.mohit.nudge.ui.common.ColorDot
 import com.mohit.nudge.ui.common.NoInsets
 import com.mohit.nudge.ui.common.PillColors
 import kotlinx.coroutines.launch
+import java.time.Instant
 import java.time.LocalDate
+import java.time.ZoneOffset
+import java.time.format.DateTimeFormatter
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -64,9 +72,12 @@ fun ImportScreen(onDone: () -> Unit) {
 
     var text by rememberSaveable { mutableStateOf("") }
     var adding by remember { mutableStateOf(false) }
+    val today = LocalDate.now().toEpochDay()
+    var startDay by rememberSaveable { mutableLongStateOf(today) }
+    var showDatePicker by remember { mutableStateOf(false) }
     val existing by repo.activeMedicines.collectAsStateWithLifecycle(initialValue = emptyList())
     val existingNames = remember(existing) { existing.map { it.name.trim().lowercase() }.toSet() }
-    val parsed = remember(text) { ImportParser.parse(text, LocalDate.now().toEpochDay(), PillColors) }
+    val parsed = remember(text, startDay) { ImportParser.parse(text, startDay, PillColors) }
     val toAdd = parsed.mapNotNull { it.medicine }.filter { it.name.trim().lowercase() !in existingNames }
 
     Scaffold(
@@ -140,6 +151,33 @@ fun ImportScreen(onDone: () -> Unit) {
                 items(parsed, key = { it.lineNo }) { line ->
                     PreviewRow(line, isDuplicate = line.medicine?.name?.trim()?.lowercase() in existingNames)
                 }
+                item(key = "start") {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Text("4. Start from", style = MaterialTheme.typography.titleMedium)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = startDay == today,
+                                onClick = { startDay = today },
+                                label = { Text("Today") },
+                            )
+                            FilterChip(
+                                selected = startDay == today + 1,
+                                onClick = { startDay = today + 1 },
+                                label = { Text("Tomorrow") },
+                            )
+                            val custom = startDay != today && startDay != today + 1
+                            FilterChip(
+                                selected = custom,
+                                onClick = { showDatePicker = true },
+                                label = {
+                                    Text(
+                                        if (custom) LocalDate.ofEpochDay(startDay).format(ShortDate) else "Pick date…",
+                                    )
+                                },
+                            )
+                        }
+                    }
+                }
                 item(key = "add") {
                     Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.fillMaxWidth()) {
                         Button(
@@ -165,7 +203,7 @@ fun ImportScreen(onDone: () -> Unit) {
                         val errors = parsed.count { it.error != null }
                         Text(
                             (if (errors > 0) "$errors line(s) in red will be skipped — fix them or add those by hand. " else "") +
-                                "All start today; you can edit any medicine afterwards.",
+                                "All start ${startLabel(startDay, today)}; you can edit any medicine afterwards.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             modifier = Modifier.padding(top = 8.dp),
@@ -175,6 +213,35 @@ fun ImportScreen(onDone: () -> Unit) {
             }
         }
     }
+
+    if (showDatePicker) {
+        val pickerState = rememberDatePickerState(
+            initialSelectedDateMillis = LocalDate.ofEpochDay(startDay)
+                .atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli(),
+        )
+        DatePickerDialog(
+            onDismissRequest = { showDatePicker = false },
+            confirmButton = {
+                TextButton(onClick = {
+                    pickerState.selectedDateMillis?.let {
+                        startDay = Instant.ofEpochMilli(it).atZone(ZoneOffset.UTC).toLocalDate().toEpochDay()
+                    }
+                    showDatePicker = false
+                }) { Text("OK") }
+            },
+            dismissButton = { TextButton(onClick = { showDatePicker = false }) { Text("Cancel") } },
+        ) {
+            DatePicker(state = pickerState)
+        }
+    }
+}
+
+private val ShortDate: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
+
+private fun startLabel(day: Long, today: Long): String = when (day) {
+    today -> "today"
+    today + 1 -> "tomorrow"
+    else -> "on " + LocalDate.ofEpochDay(day).format(ShortDate)
 }
 
 private fun Medicine.summary(): String = listOfNotNull(
