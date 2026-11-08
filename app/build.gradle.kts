@@ -17,8 +17,26 @@ android {
         versionName = "1.0"
     }
 
+    // Permanent signing key so every build can be installed over the previous one (keeping data).
+    // CI provides it via secrets; locally, set these env vars to use it (otherwise the default debug key is used).
+    val keystorePath: String? = System.getenv("NUDGE_KEYSTORE_PATH")
+    signingConfigs {
+        if (keystorePath != null) {
+            create("nudge") {
+                storeFile = file(keystorePath)
+                storePassword = System.getenv("NUDGE_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("NUDGE_KEY_ALIAS")
+                keyPassword = System.getenv("NUDGE_KEY_PASSWORD")
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("nudge")
+        }
         release {
+            if (keystorePath != null) signingConfig = signingConfigs.getByName("nudge")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
