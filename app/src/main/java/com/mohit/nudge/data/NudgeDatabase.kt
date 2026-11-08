@@ -7,6 +7,8 @@ import androidx.room.OnConflictStrategy
 import androidx.room.Query
 import androidx.room.RoomDatabase
 import androidx.room.Update
+import androidx.room.migration.Migration
+import androidx.sqlite.db.SupportSQLiteDatabase
 import kotlinx.coroutines.flow.Flow
 
 @Dao
@@ -48,8 +50,16 @@ interface DoseLogDao {
     suspend fun delete(day: Long, slot: String, medicineId: Long)
 }
 
-@Database(entities = [Medicine::class, DoseLog::class], version = 1, exportSchema = false)
+@Database(entities = [Medicine::class, DoseLog::class], version = 2, exportSchema = false)
 abstract class NudgeDatabase : RoomDatabase() {
     abstract fun medicineDao(): MedicineDao
     abstract fun doseLogDao(): DoseLogDao
+}
+
+/** v2: repeat patterns. Existing medicines become "every day". */
+val MIGRATION_1_2 = object : Migration(1, 2) {
+    override fun migrate(db: SupportSQLiteDatabase) {
+        db.execSQL("ALTER TABLE medicines ADD COLUMN intervalDays INTEGER NOT NULL DEFAULT 1")
+        db.execSQL("ALTER TABLE medicines ADD COLUMN weekdayMask INTEGER NOT NULL DEFAULT 0")
+    }
 }

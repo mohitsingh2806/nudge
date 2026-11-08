@@ -3,6 +3,7 @@ package com.mohit.nudge
 import android.app.Application
 import android.content.Context
 import androidx.room.Room
+import com.mohit.nudge.data.MIGRATION_1_2
 import com.mohit.nudge.data.NudgeDatabase
 import com.mohit.nudge.data.NudgeRepository
 import com.mohit.nudge.data.SettingsRepository
@@ -28,7 +29,9 @@ class NudgeApp : Application() {
 /** Simple manual dependency container (no DI framework needed for an app this size). */
 class AppContainer(context: Context) {
     val appScope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
-    val db: NudgeDatabase = Room.databaseBuilder(context, NudgeDatabase::class.java, "nudge.db").build()
+    val db: NudgeDatabase = Room.databaseBuilder(context, NudgeDatabase::class.java, "nudge.db")
+        .addMigrations(MIGRATION_1_2)
+        .build()
     val settings = SettingsRepository(context)
     val scheduler = ReminderScheduler(context, db, settings)
     val repo = NudgeRepository(context, db, settings, scheduler)

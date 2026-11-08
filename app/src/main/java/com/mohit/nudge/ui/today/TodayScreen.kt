@@ -50,6 +50,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mohit.nudge.container
 import com.mohit.nudge.data.DoseStatus
 import com.mohit.nudge.data.Meal
+import com.mohit.nudge.data.Medicine
+import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.NudgeRepository
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.domain.SlotDose
@@ -65,6 +67,11 @@ import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter
+
+/** Dose plus the repeat pattern for non-daily medicines, e.g. "1 tablet · Alternate days". */
+private fun Medicine.subtitle(): String =
+    listOfNotNull(dose.ifBlank { null }, repeatText().takeIf { repeatType() != RepeatType.DAILY })
+        .joinToString(" · ")
 
 class TodayViewModel(private val repo: NudgeRepository) : ViewModel() {
     val state: StateFlow<TodayState?> =
@@ -194,8 +201,9 @@ private fun HeroCard(st: SlotState, isNow: Boolean, onTakenAll: () -> Unit, onSk
                     Spacer(Modifier.width(12.dp))
                     Column {
                         Text(med.name, style = MaterialTheme.typography.titleMedium)
-                        if (med.dose.isNotBlank()) {
-                            Text(med.dose, style = MaterialTheme.typography.bodyMedium)
+                        val sub = med.subtitle()
+                        if (sub.isNotBlank()) {
+                            Text(sub, style = MaterialTheme.typography.bodyMedium)
                         }
                     }
                 }
@@ -284,9 +292,10 @@ private fun DoseLine(d: SlotDose, onSetDose: (Long, DoseStatus?) -> Unit) {
                 style = MaterialTheme.typography.bodyLarge,
                 textDecoration = if (d.status == DoseStatus.TAKEN) TextDecoration.LineThrough else null,
             )
-            if (d.medicine.dose.isNotBlank()) {
+            val sub = d.medicine.subtitle()
+            if (sub.isNotBlank()) {
                 Text(
-                    d.medicine.dose,
+                    sub,
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

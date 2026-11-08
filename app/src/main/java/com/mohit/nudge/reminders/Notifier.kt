@@ -14,6 +14,7 @@ import androidx.core.content.ContextCompat
 import com.mohit.nudge.MainActivity
 import com.mohit.nudge.R
 import com.mohit.nudge.data.Medicine
+import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.Slot
 
 object Notifier {
@@ -46,7 +47,10 @@ object Notifier {
             PackageManager.PERMISSION_GRANTED
         ) return
 
-        val lines = meds.map { if (it.dose.isBlank()) it.name else "${it.name} — ${it.dose}" }
+        val lines = meds.map { m ->
+            val base = if (m.dose.isBlank()) m.name else "${m.name} — ${m.dose}"
+            if (m.repeatType() == RepeatType.DAILY) base else "$base (${m.repeatText().lowercase()})"
+        }
         val title = "${slot.label} · ${meds.size} medicine" + if (meds.size == 1) "" else "s"
 
         val open = PendingIntent.getActivity(

@@ -27,6 +27,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mohit.nudge.container
 import com.mohit.nudge.data.Medicine
+import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.ui.common.ColorDot
 import com.mohit.nudge.ui.common.NoInsets
@@ -86,14 +87,23 @@ fun MedicinesScreen(onEdit: (Long) -> Unit) {
 
 private val DateFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("d MMM")
 
+private val NextFormat: DateTimeFormatter = DateTimeFormatter.ofPattern("EEE d MMM")
+
 private fun Medicine.scheduleText(): String {
     val today = LocalDate.now().toEpochDay()
     val start = LocalDate.ofEpochDay(startEpochDay)
-    return when {
+    val span = when {
         startEpochDay > today -> "Starts ${start.format(DateFormat)}"
         durationDays == null -> "Ongoing"
         else -> "Until ${start.plusDays(durationDays - 1L).format(DateFormat)}"
     }
+    if (repeatType() == RepeatType.DAILY) return span
+    val next = when (val d = nextDueDay(today)) {
+        null -> "no more doses"
+        today -> "next: today"
+        else -> "next: ${LocalDate.ofEpochDay(d).format(NextFormat)}"
+    }
+    return "${repeatText()} · $next · $span"
 }
 
 @Composable

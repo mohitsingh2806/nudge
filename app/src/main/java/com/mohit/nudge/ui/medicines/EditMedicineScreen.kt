@@ -5,6 +5,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +68,7 @@ import com.mohit.nudge.data.Meal
 import com.mohit.nudge.data.Medicine
 import com.mohit.nudge.data.NudgeRepository
 import com.mohit.nudge.data.NudgeSettings
+import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.data.Timing
 import com.mohit.nudge.domain.SlotTimes
@@ -74,10 +76,13 @@ import com.mohit.nudge.ui.common.NoInsets
 import com.mohit.nudge.ui.common.PillColors
 import com.mohit.nudge.ui.common.hm
 import kotlinx.coroutines.launch
+import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
+import java.time.format.TextStyle
+import java.util.Locale
 
 class EditMedicineViewModel(private val repo: NudgeRepository, private val id: Long) : ViewModel() {
     var name by mutableStateOf("")
@@ -88,6 +93,9 @@ class EditMedicineViewModel(private val repo: NudgeRepository, private val id: L
     var ongoing by mutableStateOf(true)
     var days by mutableStateOf("7")
     var notes by mutableStateOf("")
+    var repeat by mutableStateOf(RepeatType.DAILY)
+    var interval by mutableStateOf("2")
+    var weekdays by mutableStateOf(setOf<DayOfWeek>())
     var loaded by mutableStateOf(id == 0L)
         private set
 
@@ -106,35 +114,70 @@ class EditMedicineViewModel(private val repo: NudgeRepository, private val id: L
                     ongoing = m.durationDays == null
                     days = (m.durationDays ?: 7).toString()
                     notes = m.notes
+                    repeat = m.repeatType()
+                    if (m.intervalDays > 1) interval = m.intervalDays.toString()
+                    weekdays = DayOfWeek.values().filter { m.weekdayMask and Medicine.weekdayBit(it) != 0 }.toSet()
                 }
                 loaded = true
             }
         }
     }
 
+    private val repeatValid: Boolean
+        get() = when (repeat) {
+            RepeatType.DAILY -> true
+            RepeatType.EVERY_N_DAYS -> (interval.toIntOrNull() ?: 0) >= 2
+            RepeatType.WEEKDAYS -> weekdays.isNotEmpty()
+        }
+
     val canSave: Boolean
-        get() = name.isNotBlank() && slots.isNotEmpty() && (ongoing || (days.toIntOrNull() ?: 0) > 0)
+        get() = name.isNotBlank() && slots.isNotEmpty() && repeatValid &&
+            (ongoing || (days.toIntOrNull() ?: 0) > 0)
 
     fun toggle(slot: Slot) {
         slots = if (slot in slots) slots - slot else slots + slot
     }
 
+    fun toggle(day: DayOfWeek) {
+        weekdays = if (day in weekdays) weekdays - day else weekdays + day
+    }
+
+    private fun draft() = Medicine(
+        id = original?.id ?: 0L,
+        name = name.trim(),
+        dose = dose.trim(),
+        color = color,
+        slotMask = Slot.maskOf(slots),
+        startEpochDay = startDate.toEpochDay(),
+        durationDays = if (ongoing) null else days.toIntOrNull(),
+        notes = notes.trim(),
+        archivedEpochDay = original?.archivedEpochDay,
+        intervalDays = if (repeat == RepeatType.EVERY_N_DAYS) interval.toIntOrNull() ?: 2 else 1,
+        weekdayMask = if (repeat == RepeatType.WEEKDAYS) {
+            weekdays.fold(0) { acc, d -> acc or Medicine.weekdayBit(d) }
+        } else {
+            0
+        },
+    )
+
+    /** Next few due dates, to preview the repeat pattern. */
+    fun upcomingDays(count: Int = 3): List<LocalDate> {
+        if (!repeatValid) return emptyList()
+        val m = draft()
+        var day = maxOf(LocalDate.now().toEpochDay(), m.startEpochDay)
+        val out = mutableListOf<LocalDate>()
+        while (out.size < count) {
+            val next = m.nextDueDay(day) ?: break
+            out += LocalDate.ofEpochDay(next)
+            day = next + 1
+        }
+        return out
+    }
+
     fun save(onDone: () -> Unit) {
         if (!canSave) return
         viewModelScope.launch {
-            repo.saveMedicine(
-                Medicine(
-                    id = original?.id ?: 0L,
-                    name = name.trim(),
-                    dose = dose.trim(),
-                    color = color,
-                    slotMask = Slot.maskOf(slots),
-                    startEpochDay = startDate.toEpochDay(),
-                    durationDays = if (ongoing) null else days.toIntOrNull(),
-                    notes = notes.trim(),
-                    archivedEpochDay = original?.archivedEpochDay,
-                ),
-            )
+            repo.saveMedicine(draft())
             onDone()
         }
     }
@@ -208,7 +251,10 @@ fun EditMedicineScreen(id: Long, onDone: () -> Unit) {
             )
 
             Text("When do you take it?", style = MaterialTheme.typography.titleMedium)
-            SlotGrid(vm.slots, settings, vm::toggle)
+            SlotGrid(vm.slots, settings) { vm.toggle(it) }
+
+            Text("How often?", style = MaterialTheme.typography.titleMedium)
+            RepeatSection(vm)
 
             Text("Colour tag", style = MaterialTheme.typography.titleMedium)
             Row(
@@ -311,6 +357,89 @@ fun EditMedicineScreen(id: Long, onDone: () -> Unit) {
             },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text("Cancel") } },
         )
+    }
+}
+
+@Composable
+private fun RepeatSection(vm: EditMedicineViewModel) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(
+            Modifier.horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+        ) {
+            listOf(
+                RepeatType.DAILY to "Every day",
+                RepeatType.EVERY_N_DAYS to "Every few days",
+                RepeatType.WEEKDAYS to "Pick weekdays",
+            ).forEach { (type, label) ->
+                FilterChip(
+                    selected = vm.repeat == type,
+                    onClick = { vm.repeat = type },
+                    label = { Text(label) },
+                )
+            }
+        }
+
+        when (vm.repeat) {
+            RepeatType.DAILY -> Unit
+            RepeatType.EVERY_N_DAYS -> {
+                OutlinedTextField(
+                    value = vm.interval,
+                    onValueChange = { v -> vm.interval = v.filter { it.isDigit() }.take(3) },
+                    label = { Text("Repeat every … days") },
+                    supportingText = { Text("2 = alternate days. Counted from the start date.") },
+                    singleLine = true,
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
+                    modifier = Modifier.fillMaxWidth(),
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("2" to "Alternate days", "7" to "Weekly", "14" to "2 weeks").forEach { (n, label) ->
+                        FilterChip(
+                            selected = vm.interval == n,
+                            onClick = { vm.interval = n },
+                            label = { Text(label) },
+                        )
+                    }
+                }
+            }
+            RepeatType.WEEKDAYS -> {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    DayOfWeek.values().forEach { day ->
+                        val on = day in vm.weekdays
+                        Box(
+                            Modifier
+                                .weight(1f)
+                                .aspectRatio(1f)
+                                .clip(CircleShape)
+                                .background(
+                                    if (on) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant,
+                                )
+                                .clickable { vm.toggle(day) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Text(
+                                day.getDisplayName(TextStyle.SHORT, Locale.getDefault()).take(2),
+                                color = if (on) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurfaceVariant,
+                                style = MaterialTheme.typography.labelMedium,
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        if (vm.repeat != RepeatType.DAILY) {
+            val upcoming = vm.upcomingDays()
+            Text(
+                if (upcoming.isEmpty()) {
+                    if (vm.repeat == RepeatType.WEEKDAYS) "Pick at least one day" else "Enter 2 or more days"
+                } else {
+                    "Next doses: " + upcoming.joinToString(", ") { it.format(DateTimeFormatter.ofPattern("EEE d MMM")) }
+                },
+                style = MaterialTheme.typography.bodyMedium,
+                color = MaterialTheme.colorScheme.primary,
+            )
+        }
     }
 }
 
