@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.longPreferencesKey
@@ -23,6 +24,9 @@ data class NudgeSettings(
     val afterOffsetMin: Int = 15,
     val renotifyMin: Int = 10,
     val giveUpMin: Int = 60,
+    /** Evening-before heads-up for non-daily medicines. */
+    val headsUpEnabled: Boolean = true,
+    val headsUpMin: Int = 21 * 60,
     /** Epoch millis of the last "I just ate" tap per meal. */
     val ateAt: Map<Meal, Long> = emptyMap(),
 ) {
@@ -48,6 +52,8 @@ class SettingsRepository(private val context: Context) {
         val after = intPreferencesKey("after_offset_min")
         val renotify = intPreferencesKey("renotify_min")
         val giveUp = intPreferencesKey("give_up_min")
+        val headsUpEnabled = booleanPreferencesKey("heads_up_enabled")
+        val headsUpMin = intPreferencesKey("heads_up_min")
         fun ate(meal: Meal) = longPreferencesKey("ate_${meal.name}")
         fun meal(meal: Meal) = when (meal) {
             Meal.BREAKFAST -> breakfast
@@ -66,6 +72,8 @@ class SettingsRepository(private val context: Context) {
             afterOffsetMin = p[Keys.after] ?: d.afterOffsetMin,
             renotifyMin = p[Keys.renotify] ?: d.renotifyMin,
             giveUpMin = p[Keys.giveUp] ?: d.giveUpMin,
+            headsUpEnabled = p[Keys.headsUpEnabled] ?: d.headsUpEnabled,
+            headsUpMin = p[Keys.headsUpMin] ?: d.headsUpMin,
             ateAt = Meal.entries.mapNotNull { m -> p[Keys.ate(m)]?.let { m to it } }.toMap(),
         )
     }
@@ -81,5 +89,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAfterOffset(min: Int) = edit { it[Keys.after] = min }
     suspend fun setRenotify(min: Int) = edit { it[Keys.renotify] = min }
     suspend fun setGiveUp(min: Int) = edit { it[Keys.giveUp] = min }
+    suspend fun setHeadsUpEnabled(on: Boolean) = edit { it[Keys.headsUpEnabled] = on }
+    suspend fun setHeadsUpTime(minuteOfDay: Int) = edit { it[Keys.headsUpMin] = minuteOfDay }
     suspend fun setAteAt(meal: Meal, millis: Long) = edit { it[Keys.ate(meal)] = millis }
 }

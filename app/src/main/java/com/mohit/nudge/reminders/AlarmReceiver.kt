@@ -7,6 +7,7 @@ import com.mohit.nudge.AppContainer
 import com.mohit.nudge.container
 import com.mohit.nudge.data.DoseStatus
 import com.mohit.nudge.data.Slot
+import com.mohit.nudge.domain.headsUpItems
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -25,6 +26,17 @@ class AlarmReceiver : BroadcastReceiver() {
     }
 
     private suspend fun handle(context: Context, c: AppContainer, intent: Intent) {
+        if (intent.action == ACTION_HEADS_UP) {
+            // Use the evening the alarm was meant for, even if it fires late (after midnight).
+            val evening = intent.getLongExtra(EXTRA_DAY, LocalDate.now().toEpochDay())
+            val items = headsUpItems(evening, c.repo.allMedicinesNow())
+            if (items.isNotEmpty() && c.settings.get().headsUpEnabled) {
+                Notifier.showHeadsUp(context, items)
+            }
+            c.scheduler.rescheduleAll()
+            return
+        }
+
         val slot = intent.getStringExtra(EXTRA_SLOT)
             ?.let { runCatching { Slot.valueOf(it) }.getOrNull() } ?: return
         val day = intent.getLongExtra(EXTRA_DAY, LocalDate.now().toEpochDay())
@@ -67,6 +79,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_TAKEN_ALL = "com.mohit.nudge.TAKEN_ALL"
         const val ACTION_SNOOZE = "com.mohit.nudge.SNOOZE"
         const val ACTION_ATE = "com.mohit.nudge.ATE"
+        const val ACTION_HEADS_UP = "com.mohit.nudge.HEADS_UP"
         const val EXTRA_SLOT = "slot"
         const val EXTRA_DAY = "day"
         const val EXTRA_SLOT_TIME = "slot_time"

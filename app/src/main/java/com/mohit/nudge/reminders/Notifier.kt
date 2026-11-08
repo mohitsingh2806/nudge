@@ -19,6 +19,8 @@ import com.mohit.nudge.data.Slot
 
 object Notifier {
     private const val CHANNEL_ID = "reminders"
+    private const val HEADS_UP_CHANNEL_ID = "heads_up"
+    private const val HEADS_UP_ID = 2000
 
     fun createChannel(context: Context) {
         val channel = NotificationChannel(
@@ -27,8 +29,49 @@ object Notifier {
             description = "Reminds you to take medicines before and after meals"
             enableVibration(true)
         }
-        (context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager)
-            .createNotificationChannel(channel)
+        val headsUp = NotificationChannel(
+            HEADS_UP_CHANNEL_ID, "Tomorrow's medicines", NotificationManager.IMPORTANCE_DEFAULT,
+        ).apply {
+            description = "Evening heads-up for medicines you don't take every day"
+        }
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.createNotificationChannel(channel)
+        nm.createNotificationChannel(headsUp)
+    }
+
+    /** "Tomorrow: Vitamin D — 1 tablet · after breakfast (once a week)" */
+    fun showHeadsUp(context: Context, meds: List<Medicine>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
+
+        val lines = meds.map { m ->
+            val dose = if (m.dose.isBlank()) "" else " — ${m.dose}"
+            val slots = m.slots().joinToString(", ") { it.label.lowercase() }
+            "${m.name}$dose · $slots (${m.repeatText().lowercase()})"
+        }
+        val title = if (meds.size == 1) "Tomorrow: ${meds.first().name}" else "Tomorrow: ${meds.size} extra medicines"
+        val style = NotificationCompat.InboxStyle()
+        lines.forEach { style.addLine(it) }
+
+        val open = PendingIntent.getActivity(
+            context, 1,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, HEADS_UP_CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_nudge)
+            .setColor(0xFF00897B.toInt())
+            .setContentTitle(title)
+            .setContentText(lines.joinToString("; "))
+            .setStyle(style)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .build()
+        NotificationManagerCompat.from(context).notify(HEADS_UP_ID, notification)
     }
 
     private fun notificationId(slot: Slot) = 1000 + slot.ordinal

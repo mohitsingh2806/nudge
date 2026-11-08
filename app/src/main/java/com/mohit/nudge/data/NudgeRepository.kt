@@ -59,6 +59,8 @@ class NudgeRepository(
 
     suspend fun getMedicine(id: Long): Medicine? = medDao.get(id)
 
+    suspend fun allMedicinesNow(): List<Medicine> = medDao.getAll()
+
     suspend fun saveMedicine(medicine: Medicine) {
         if (medicine.id == 0L) medDao.insert(medicine) else medDao.update(medicine)
         onDataChanged()

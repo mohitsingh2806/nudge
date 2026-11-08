@@ -8,6 +8,7 @@ import android.os.Build
 import com.mohit.nudge.data.Medicine
 import com.mohit.nudge.data.NudgeDatabase
 import com.mohit.nudge.data.NudgeSettings
+import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.SettingsRepository
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.domain.SlotTimes
@@ -30,6 +31,29 @@ class ReminderScheduler(
         val meds = db.medicineDao().getAll()
         val now = ZonedDateTime.now()
         Slot.entries.forEach { scheduleNext(it, s, meds, now) }
+        scheduleHeadsUp(s, meds, now)
+    }
+
+    /** Daily alarm at the heads-up time; the receiver decides whether there's anything to say. */
+    private fun scheduleHeadsUp(s: NudgeSettings, meds: List<Medicine>, now: ZonedDateTime) {
+        val hasNonDaily = meds.any { it.archivedEpochDay == null && it.repeatType() != RepeatType.DAILY }
+        if (!s.headsUpEnabled || !hasNonDaily) {
+            alarmManager.cancel(headsUpIntent(0))
+            return
+        }
+        var at = now.toLocalDate().atTime(s.headsUpMin / 60, s.headsUpMin % 60).atZone(now.zone)
+        if (!at.isAfter(now)) at = at.plusDays(1)
+        setAlarm(at.toInstant().toEpochMilli(), headsUpIntent(at.toLocalDate().toEpochDay()))
+    }
+
+    private fun headsUpIntent(day: Long): PendingIntent {
+        val intent = Intent(context, AlarmReceiver::class.java)
+            .setAction(AlarmReceiver.ACTION_HEADS_UP)
+            .putExtra(AlarmReceiver.EXTRA_DAY, day)
+        return PendingIntent.getBroadcast(
+            context, REQ_HEADS_UP, intent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
     }
 
     private fun scheduleNext(slot: Slot, s: NudgeSettings, meds: List<Medicine>, now: ZonedDateTime) {
@@ -82,5 +106,6 @@ class ReminderScheduler(
     private companion object {
         const val REQ_MAIN = 0
         const val REQ_RENOTIFY = 100
+        const val REQ_HEADS_UP = 50
     }
 }

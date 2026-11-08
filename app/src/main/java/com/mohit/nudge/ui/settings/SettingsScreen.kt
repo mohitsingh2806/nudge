@@ -26,6 +26,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -48,7 +49,6 @@ import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mohit.nudge.container
 import com.mohit.nudge.data.Meal
-import com.mohit.nudge.data.NudgeSettings
 import com.mohit.nudge.ui.common.NoInsets
 import com.mohit.nudge.ui.common.minuteOfDayText
 import kotlinx.coroutines.launch
@@ -61,6 +61,7 @@ fun SettingsScreen() {
     val settings by c.settings.flow.collectAsStateWithLifecycle(initialValue = null)
     val scope = rememberCoroutineScope()
     var editingMeal by remember { mutableStateOf<Meal?>(null) }
+    var editingHeadsUp by remember { mutableStateOf(false) }
 
     // Re-check permission status whenever the user comes back from system settings.
     var resumeTick by remember { mutableIntStateOf(0) }
@@ -134,6 +135,28 @@ fun SettingsScreen() {
             )
 
             HorizontalDivider()
+            SectionTitle("Night-before reminder")
+            ListItem(
+                headlineContent = { Text("Remind me the evening before") },
+                supportingContent = { Text("For medicines you don't take every day (alternate days, weekly…)") },
+                trailingContent = {
+                    Switch(
+                        checked = s.headsUpEnabled,
+                        onCheckedChange = { on -> change { c.settings.setHeadsUpEnabled(on) } },
+                    )
+                },
+            )
+            if (s.headsUpEnabled) {
+                ListItem(
+                    modifier = Modifier.clickable { editingHeadsUp = true },
+                    headlineContent = { Text("Time") },
+                    trailingContent = {
+                        Text(minuteOfDayText(s.headsUpMin), style = MaterialTheme.typography.titleMedium)
+                    },
+                )
+            }
+
+            HorizontalDivider()
             SectionTitle("Make reminders reliable")
             ReliabilitySection(context, resumeTick, c.scheduler.canScheduleExact())
 
@@ -147,13 +170,24 @@ fun SettingsScreen() {
         }
 
         editingMeal?.let { meal ->
-            MealTimeDialog(
-                meal = meal,
-                settings = s,
+            TimeDialog(
+                title = "${meal.label} time",
+                initialMinute = s.mealMinute(meal),
                 onDismiss = { editingMeal = null },
                 onConfirm = { minute ->
                     change { c.settings.setMealTime(meal, minute) }
                     editingMeal = null
+                },
+            )
+        }
+        if (editingHeadsUp) {
+            TimeDialog(
+                title = "Night-before reminder time",
+                initialMinute = s.headsUpMin,
+                onDismiss = { editingHeadsUp = false },
+                onConfirm = { minute ->
+                    change { c.settings.setHeadsUpTime(minute) }
+                    editingHeadsUp = false
                 },
             )
         }
@@ -253,12 +287,15 @@ private fun Context.safeStart(intent: Intent) {
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun MealTimeDialog(meal: Meal, settings: NudgeSettings, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
-    val initial = settings.mealMinute(meal)
-    val state = rememberTimePickerState(initialHour = initial / 60, initialMinute = initial % 60, is24Hour = false)
+private fun TimeDialog(title: String, initialMinute: Int, onDismiss: () -> Unit, onConfirm: (Int) -> Unit) {
+    val state = rememberTimePickerState(
+        initialHour = initialMinute / 60,
+        initialMinute = initialMinute % 60,
+        is24Hour = false,
+    )
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("${meal.label} time") },
+        title = { Text(title) },
         text = { TimePicker(state = state) },
         confirmButton = { TextButton(onClick = { onConfirm(state.hour * 60 + state.minute) }) { Text("OK") } },
         dismissButton = { TextButton(onClick = onDismiss) { Text("Cancel") } },
