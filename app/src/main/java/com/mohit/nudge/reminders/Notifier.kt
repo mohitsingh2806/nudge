@@ -84,6 +84,8 @@ object Notifier {
         meds: List<Medicine>,
         snoozeMin: Int,
         showAte: Boolean,
+        /** Minutes until the slot is marked missed, when this is the final reminder; else null. */
+        lastReminderMin: Long? = null,
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
@@ -122,12 +124,55 @@ object Notifier {
         if (showAte) {
             builder.addAction(0, "I just ate", action(context, AlarmReceiver.ACTION_ATE, slot, day, slotTimeMillis, 400))
         }
+        if (lastReminderMin != null) {
+            builder.setSubText("Last reminder · marked missed in ${lastReminderMin.coerceAtLeast(1)} min")
+        }
 
         NotificationManagerCompat.from(context).notify(notificationId(slot), builder.build())
     }
 
     fun cancel(context: Context, slot: Slot) {
         NotificationManagerCompat.from(context).cancel(notificationId(slot))
+    }
+
+    private fun missedId(slot: Slot) = 1100 + slot.ordinal
+
+    /** Shown once when the app stops reminding, so a slot is never marked missed silently. */
+    fun showMissed(context: Context, slot: Slot, day: Long, meds: List<Medicine>) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
+
+        val lines = meds.map { m -> if (m.dose.isBlank()) m.name else "${m.name} — ${m.dose}" }
+        val title = "Missed · ${slot.label.lowercase()}"
+        val style = NotificationCompat.InboxStyle()
+        lines.forEach { style.addLine("• $it") }
+        style.setSummaryText("No more reminders for this slot")
+
+        val open = PendingIntent.getActivity(
+            context, 0,
+            Intent(context, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP),
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE,
+        )
+        val notification = NotificationCompat.Builder(context, CHANNEL_ID)
+            .setSmallIcon(R.drawable.ic_stat_nudge)
+            .setColor(0xFF00897B.toInt())
+            .setContentTitle(title)
+            .setContentText(lines.joinToString(", "))
+            .setStyle(style)
+            .setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setCategory(NotificationCompat.CATEGORY_REMINDER)
+            .setContentIntent(open)
+            .setAutoCancel(true)
+            .addAction(0, "I took them", action(context, AlarmReceiver.ACTION_TOOK_MISSED, slot, day, 0L, 500))
+            .build()
+        NotificationManagerCompat.from(context).notify(missedId(slot), notification)
+    }
+
+    fun cancelMissed(context: Context, slot: Slot) {
+        NotificationManagerCompat.from(context).cancel(missedId(slot))
     }
 
     private fun action(

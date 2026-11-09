@@ -113,6 +113,20 @@ class NudgeRepository(
             )
         }
         if (pendingMeds(day, slot).isEmpty()) clearReminder(slot)
+        if (logDao.getDay(day).none { it.slot == slot && it.status == DoseStatus.MISSED }) {
+            Notifier.cancelMissed(context, slot)
+        }
+        refreshWidget()
+    }
+
+    /** "I took them" on the missed notification: the slot's Missed doses become Taken. */
+    suspend fun takeMissed(day: Long, slot: Slot) {
+        val now = System.currentTimeMillis()
+        val logs = logDao.getDay(day)
+            .filter { it.slot == slot && it.status == DoseStatus.MISSED }
+            .map { it.copy(status = DoseStatus.TAKEN, timestamp = now) }
+        if (logs.isNotEmpty()) logDao.upsertAll(logs)
+        Notifier.cancelMissed(context, slot)
         refreshWidget()
     }
 

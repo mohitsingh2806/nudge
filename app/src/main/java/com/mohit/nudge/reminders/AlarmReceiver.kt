@@ -53,6 +53,7 @@ class AlarmReceiver : BroadcastReceiver() {
                 Notifier.cancel(context, slot)
                 c.repo.justAte(slot.meal)
             }
+            ACTION_TOOK_MISSED -> c.repo.takeMissed(day, slot)
         }
     }
 
@@ -62,10 +63,16 @@ class AlarmReceiver : BroadcastReceiver() {
         val elapsedMin = (System.currentTimeMillis() - slotTime) / 60_000
         when {
             pending.isEmpty() -> Notifier.cancel(context, slot)
-            elapsedMin >= s.giveUpMin -> c.repo.markSlot(day, slot, DoseStatus.MISSED)
+            elapsedMin >= s.giveUpMin -> {
+                c.repo.markSlot(day, slot, DoseStatus.MISSED)
+                Notifier.showMissed(context, slot, day, pending)
+            }
             else -> {
                 val showAte = !s.ateOn(slot.meal, LocalDate.ofEpochDay(day))
-                Notifier.show(context, slot, day, slotTime, pending, s.renotifyMin, showAte)
+                // The next follow-up (or snooze) will land past the give-up time, so say so now.
+                val minutesLeft = s.giveUpMin - elapsedMin
+                val lastReminder = if (minutesLeft <= s.renotifyMin) minutesLeft else null
+                Notifier.show(context, slot, day, slotTime, pending, s.renotifyMin, showAte, lastReminder)
                 c.scheduler.scheduleRenotify(slot, day, slotTime, s.renotifyMin)
             }
         }
@@ -80,6 +87,7 @@ class AlarmReceiver : BroadcastReceiver() {
         const val ACTION_SNOOZE = "com.mohit.nudge.SNOOZE"
         const val ACTION_ATE = "com.mohit.nudge.ATE"
         const val ACTION_HEADS_UP = "com.mohit.nudge.HEADS_UP"
+        const val ACTION_TOOK_MISSED = "com.mohit.nudge.TOOK_MISSED"
         const val EXTRA_SLOT = "slot"
         const val EXTRA_DAY = "day"
         const val EXTRA_SLOT_TIME = "slot_time"
