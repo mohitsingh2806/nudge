@@ -18,7 +18,7 @@ Unit tests: `./gradlew test` (once the wrapper is added) or right-click `app/src
 ## Features
 - **Today**: big "NOW / NEXT" card with one **Taken all** button, plus the full day's timeline with
   per-medicine ✓ / ✕ (tap a status chip to undo).
-- **I just ate**: moves the after-food reminder to *now + offset*. If you never tap it, the after-food
+- **I just ate** (button in reminder notifications): moves the after-food reminder to *now + offset*. If you never tap it, the after-food
   reminder still fires at the planned meal time + offset.
 - **Reminders**: notification with *Taken all / Snooze / I just ate*. Repeats every 10 min until you act;
   after 60 min the doses are marked **Missed**. Survives reboot, app update and clock changes.

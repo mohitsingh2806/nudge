@@ -2,11 +2,9 @@ package com.mohit.nudge.domain
 
 import com.mohit.nudge.data.DoseLog
 import com.mohit.nudge.data.DoseStatus
-import com.mohit.nudge.data.Meal
 import com.mohit.nudge.data.Medicine
 import com.mohit.nudge.data.NudgeSettings
 import com.mohit.nudge.data.Slot
-import com.mohit.nudge.data.Timing
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
@@ -31,20 +29,6 @@ data class TodayState(
     val hero: SlotState? get() = slots.firstOrNull { !it.isDone }
 
     val heroIsNow: Boolean get() = hero?.let { !it.time.isAfter(now) } ?: false
-
-    /**
-     * Meal for which to show the "I just ate" button: an after-food slot is still pending,
-     * the user hasn't tapped it yet today, and we're within 90 min before to 3 h after the meal.
-     */
-    val ateCandidate: Meal?
-        get() = slots.firstOrNull { st ->
-            st.slot.timing == Timing.AFTER &&
-                !st.isDone &&
-                !settings.ateOn(st.slot.meal, date) &&
-                SlotTimes.mealTime(date, st.slot.meal, settings).let { meal ->
-                    !now.isBefore(meal.minusMinutes(90)) && now.isBefore(meal.plusHours(3))
-                }
-        }?.slot?.meal
 }
 
 fun buildToday(

@@ -23,12 +23,10 @@ import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ElevatedCard
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilledTonalIconButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedCard
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -49,7 +47,6 @@ import androidx.lifecycle.viewModelScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.mohit.nudge.container
 import com.mohit.nudge.data.DoseStatus
-import com.mohit.nudge.data.Meal
 import com.mohit.nudge.data.Medicine
 import com.mohit.nudge.data.RepeatType
 import com.mohit.nudge.data.NudgeRepository
@@ -85,10 +82,6 @@ class TodayViewModel(private val repo: NudgeRepository) : ViewModel() {
     fun setDose(slot: Slot, medicineId: Long, status: DoseStatus?) {
         val day = state.value?.epochDay ?: return
         viewModelScope.launch { repo.setDose(day, slot, medicineId, status) }
-    }
-
-    fun justAte(meal: Meal) {
-        viewModelScope.launch { repo.justAte(meal) }
     }
 }
 
@@ -163,9 +156,6 @@ private fun TodayContent(s: TodayState, vm: TodayViewModel) {
                 AllDoneCard(hasSlots = s.slots.isNotEmpty())
             }
         }
-        s.ateCandidate?.let { meal ->
-            item(key = "ate") { AteCard(meal, s.settings.afterOffsetMin) { vm.justAte(meal) } }
-        }
         if (s.slots.isNotEmpty()) {
             item(key = "header") {
                 Text(
@@ -233,24 +223,6 @@ private fun AllDoneCard(hasSlots: Boolean) {
                 fontWeight = FontWeight.Bold,
             )
             if (hasSlots) Text("Nice work. See you tomorrow.")
-        }
-    }
-}
-
-@Composable
-private fun AteCard(meal: Meal, afterOffsetMin: Int, onAte: () -> Unit) {
-    OutlinedCard(Modifier.fillMaxWidth()) {
-        Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
-            Column(Modifier.weight(1f)) {
-                Text("Eating ${meal.label.lowercase()}?", style = MaterialTheme.typography.titleMedium)
-                Text(
-                    "Tap when you finish — after-food reminder comes $afterOffsetMin min later.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-            Spacer(Modifier.width(12.dp))
-            FilledTonalButton(onClick = onAte) { Text("I just ate") }
         }
     }
 }
