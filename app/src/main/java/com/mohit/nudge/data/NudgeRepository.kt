@@ -130,14 +130,6 @@ class NudgeRepository(
         refreshWidget()
     }
 
-    /** "I just ate": after-food reminder moves to now + after-offset. */
-    suspend fun justAte(meal: Meal) {
-        settings.setAteAt(meal, System.currentTimeMillis())
-        clearReminder(Slot.of(meal, Timing.AFTER))
-        scheduler.rescheduleAll()
-        refreshWidget()
-    }
-
     suspend fun onDataChanged() {
         scheduler.rescheduleAll()
         refreshWidget()

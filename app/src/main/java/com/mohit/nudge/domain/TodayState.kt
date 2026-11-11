@@ -40,7 +40,7 @@ fun buildToday(
 ): TodayState {
     val day = date.toEpochDay()
     val logMap = logs.associateBy { it.slot to it.medicineId }
-    val slots = Slot.entries.mapNotNull { slot ->
+    val slots = Slot.displayOrder.mapNotNull { slot ->
         val due = meds.filter { it.isDueOn(day, slot) }
         if (due.isEmpty()) {
             null
@@ -51,6 +51,6 @@ fun buildToday(
                 doses = due.map { SlotDose(it, logMap[slot to it.id]?.status) },
             )
         }
-    }
+    }.sortedBy { it.time } // Evening's time is user-set, so order by the actual time of day.
     return TodayState(date, now, settings, slots, meds.any { it.archivedEpochDay == null })
 }

@@ -83,7 +83,6 @@ object Notifier {
         slotTimeMillis: Long,
         meds: List<Medicine>,
         snoozeMin: Int,
-        showAte: Boolean,
         /** Minutes until the slot is marked missed, when this is the final reminder; else null. */
         lastReminderMin: Long? = null,
     ) {
@@ -121,9 +120,7 @@ object Notifier {
             .setOnlyAlertOnce(false)
             .addAction(0, "Taken all", action(context, AlarmReceiver.ACTION_TAKEN_ALL, slot, day, slotTimeMillis, 200))
             .addAction(0, "Snooze $snoozeMin min", action(context, AlarmReceiver.ACTION_SNOOZE, slot, day, slotTimeMillis, 300))
-        if (showAte) {
-            builder.addAction(0, "I just ate", action(context, AlarmReceiver.ACTION_ATE, slot, day, slotTimeMillis, 400))
-        }
+            .addAction(0, "Skip", action(context, AlarmReceiver.ACTION_SKIP, slot, day, slotTimeMillis, 400))
         if (lastReminderMin != null) {
             builder.setSubText("Last reminder · marked missed in ${lastReminderMin.coerceAtLeast(1)} min")
         }

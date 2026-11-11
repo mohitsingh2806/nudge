@@ -24,7 +24,7 @@ data class HistoryState(
 
 fun dayRows(day: Long, meds: List<Medicine>, logs: List<DoseLog>): List<HistoryDose> {
     val map = logs.associateBy { it.slot to it.medicineId }
-    return Slot.entries.flatMap { slot ->
+    return Slot.displayOrder.flatMap { slot ->
         meds.filter { it.isDueOn(day, slot) }.map { HistoryDose(slot, it, map[slot to it.id]?.status) }
     }
 }

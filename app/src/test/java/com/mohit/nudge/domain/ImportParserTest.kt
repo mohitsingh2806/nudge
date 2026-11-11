@@ -86,4 +86,14 @@ class ImportParserTest {
         assertEquals(ImportParser.Parsed.Ok(30), ImportParser.parseDays("1 month"))
         assertEquals(ImportParser.Parsed.Ok(null), ImportParser.parseDays(""))
     }
+
+    @Test
+    fun eveningSlot() {
+        fun slots(s: String) = (ImportParser.parseSlots(s) as ImportParser.Parsed.Ok).value
+        assertEquals(setOf(Slot.EVENING), slots("EV"))
+        assertEquals(setOf(Slot.EVENING), slots("evening"))
+        assertEquals(setOf(Slot.MORNING_AFTER, Slot.EVENING), slots("AB+EV"))
+        // A dinner word keeps it a dinner slot.
+        assertEquals(setOf(Slot.NIGHT_AFTER), slots("after dinner in the evening"))
+    }
 }

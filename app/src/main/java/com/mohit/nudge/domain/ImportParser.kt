@@ -25,10 +25,11 @@ object ImportParser {
           BB = before breakfast, AB = after breakfast
           BL = before lunch,     AL = after lunch
           BD = before dinner,    AD = after dinner
+          EV = evening, between lunch and dinner (food doesn't matter)
           ANY = once a day, any time (taken in the morning)
           ("empty stomach" in the morning = BB, "with food" = after. 1-0-1 means morning and night.)
           If food timing is not mentioned or doesn't matter: morning = AB, afternoon = AL,
-          night / bedtime = AD, once daily = ANY. Do NOT write ?? just because food timing is missing.
+          evening = EV, night / bedtime = AD, once daily = ANY. Do NOT write ?? just because food timing is missing.
           Do NOT copy prescription abbreviations: on prescriptions OD = once daily, BD/BID = twice daily
           (use AB+AD), TDS/TID = three times daily (use AB+AL+AD), HS = bedtime (use AD).
         How often = daily, alternate days, every N days, weekly, or weekday names like Mon Thu
@@ -101,16 +102,17 @@ object ImportParser {
         // Food timing doesn't matter: once a day, morning.
         "any" to Slot.MORNING_AFTER, "anytime" to Slot.MORNING_AFTER,
         "hs" to Slot.NIGHT_AFTER,
+        "ev" to Slot.EVENING, "evening" to Slot.EVENING,
     )
 
     fun parseSlots(s: String): Parsed<Set<Slot>> {
-        if (s.isBlank()) return Parsed.Err("Missing \"When\" (use BB, AB, BL, AL, BD, AD).")
+        if (s.isBlank()) return Parsed.Err("Missing \"When\" (use BB, AB, BL, AL, EV, BD, AD).")
         val parts = s.lowercase().split('+', ',', '&', '/', ';').flatMap { it.split(" and ") }
             .map { it.trim() }.filter { it.isNotEmpty() }
         val slots = mutableSetOf<Slot>()
         for (p in parts) {
             slots += slotCodes[p.replace(" ", "")] ?: slotFromPhrase(p)
-                ?: return Parsed.Err("Don't understand \"$p\". Use BB, AB, BL, AL, BD, AD.")
+                ?: return Parsed.Err("Don't understand \"$p\". Use BB, AB, BL, AL, EV, BD, AD.")
         }
         return Parsed.Ok(slots)
     }
@@ -119,8 +121,12 @@ object ImportParser {
      * "before breakfast", "after dinner", "empty stomach" …
      * With no food word ("morning", "night", "bedtime"), food doesn't matter, so the
      * after-food slot for that time of day is used. "once daily" / "any time" = morning.
+     * "evening" on its own is the Evening slot; with a dinner word it stays a dinner slot.
      */
     private fun slotFromPhrase(p: String): Slot? {
+        if ("evening" in p && listOf("dinner", "night", "bed", "before", "after").none { it in p }) {
+            return Slot.EVENING
+        }
         val timing = when {
             "before" in p || "empty" in p -> Timing.BEFORE
             "after" in p || "with food" in p -> Timing.AFTER

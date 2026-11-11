@@ -1,6 +1,5 @@
 package com.mohit.nudge.domain
 
-import com.mohit.nudge.data.Meal
 import com.mohit.nudge.data.NudgeSettings
 import com.mohit.nudge.data.Slot
 import org.junit.Assert.assertEquals
@@ -28,18 +27,33 @@ class SlotTimesTest {
     }
 
     @Test
-    fun justAteTodayMovesAfterFoodReminder() {
-        val ate = date.atTime(9, 40).atZone(zone).toInstant().toEpochMilli()
-        val s = settings.copy(ateAt = mapOf(Meal.BREAKFAST to ate))
-        assertEquals(LocalTime.of(9, 55), time(Slot.MORNING_AFTER, s))
-        // other meals unaffected
-        assertEquals(LocalTime.of(12, 45), time(Slot.NOON_AFTER, s))
+    fun eveningUsesItsOwnTimeWithNoOffset() {
+        assertEquals(LocalTime.of(17, 0), time(Slot.EVENING))
+        assertEquals(LocalTime.of(18, 30), time(Slot.EVENING, settings.copy(eveningMin = 18 * 60 + 30)))
+        // Offsets only apply to meal slots.
+        val shifted = settings.copy(beforeOffsetMin = 45, afterOffsetMin = 30)
+        assertEquals(LocalTime.of(17, 0), time(Slot.EVENING, shifted))
     }
 
     @Test
-    fun justAteYesterdayIsIgnored() {
-        val ate = date.minusDays(1).atTime(9, 40).atZone(zone).toInstant().toEpochMilli()
-        val s = settings.copy(ateAt = mapOf(Meal.BREAKFAST to ate))
-        assertEquals(LocalTime.of(9, 15), time(Slot.MORNING_AFTER, s))
+    fun existingSlotBitsNeverChange() {
+        // Saved medicines store these bits; changing them would scramble everyone's data.
+        assertEquals(1, Slot.MORNING_BEFORE.bit)
+        assertEquals(2, Slot.MORNING_AFTER.bit)
+        assertEquals(4, Slot.NOON_BEFORE.bit)
+        assertEquals(8, Slot.NOON_AFTER.bit)
+        assertEquals(16, Slot.NIGHT_BEFORE.bit)
+        assertEquals(32, Slot.NIGHT_AFTER.bit)
+        assertEquals(64, Slot.EVENING.bit)
+    }
+
+    @Test
+    fun eveningShowsBetweenLunchAndDinner() {
+        assertEquals(
+            listOf(Slot.MORNING_BEFORE, Slot.MORNING_AFTER, Slot.NOON_BEFORE, Slot.NOON_AFTER, Slot.EVENING, Slot.NIGHT_BEFORE, Slot.NIGHT_AFTER),
+            Slot.fromMask(127),
+        )
+        assertEquals(Slot.entries.toSet(), Slot.displayOrder.toSet())
+        assertEquals("Evening", Slot.EVENING.label)
     }
 }

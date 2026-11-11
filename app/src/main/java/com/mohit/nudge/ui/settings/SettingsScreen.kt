@@ -62,6 +62,7 @@ fun SettingsScreen() {
     val scope = rememberCoroutineScope()
     var editingMeal by remember { mutableStateOf<Meal?>(null) }
     var editingHeadsUp by remember { mutableStateOf(false) }
+    var editingEvening by remember { mutableStateOf(false) }
 
     // Re-check permission status whenever the user comes back from system settings.
     var resumeTick by remember { mutableIntStateOf(0) }
@@ -89,8 +90,18 @@ fun SettingsScreen() {
             return@Scaffold
         }
         Column(Modifier.padding(padding).fillMaxSize().verticalScroll(rememberScrollState())) {
-            SectionTitle("Meal times")
+            SectionTitle("Reminder times")
             Meal.entries.forEach { meal ->
+                if (meal == Meal.DINNER) {
+                    ListItem(
+                        modifier = Modifier.clickable { editingEvening = true },
+                        headlineContent = { Text("Evening") },
+                        supportingContent = { Text("Reminder at this time, food doesn't matter") },
+                        trailingContent = {
+                            Text(minuteOfDayText(s.eveningMin), style = MaterialTheme.typography.titleMedium)
+                        },
+                    )
+                }
                 val mealMin = s.mealMinute(meal)
                 ListItem(
                     modifier = Modifier.clickable { editingMeal = meal },
@@ -177,6 +188,17 @@ fun SettingsScreen() {
                 onConfirm = { minute ->
                     change { c.settings.setMealTime(meal, minute) }
                     editingMeal = null
+                },
+            )
+        }
+        if (editingEvening) {
+            TimeDialog(
+                title = "Evening time",
+                initialMinute = s.eveningMin,
+                onDismiss = { editingEvening = false },
+                onConfirm = { minute ->
+                    change { c.settings.setEveningTime(minute) }
+                    editingEvening = false
                 },
             )
         }

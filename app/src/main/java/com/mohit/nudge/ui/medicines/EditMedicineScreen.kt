@@ -478,10 +478,9 @@ private fun RepeatSection(vm: EditMedicineViewModel) {
     }
 }
 
-/** 3x2 grid: rows = Morning / Noon / Night, columns = Before / After food. */
+/** Rows = Morning / Noon / Evening / Night; meal rows have Before / After food columns, Evening has one chip. */
 @Composable
 private fun SlotGrid(selected: Set<Slot>, settings: NudgeSettings, onToggle: (Slot) -> Unit) {
-    val planned = settings.copy(ateAt = emptyMap())
     val today = LocalDate.now()
     Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -500,34 +499,62 @@ private fun SlotGrid(selected: Set<Slot>, settings: NudgeSettings, onToggle: (Sl
             )
         }
         Meal.entries.forEach { meal ->
+            if (meal == Meal.DINNER) EveningRow(selected, settings, today, onToggle)
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Column(Modifier.width(76.dp)) {
-                    Text(meal.period, style = MaterialTheme.typography.titleSmall)
-                    Text(
-                        meal.label,
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
+                RowLabel(meal.period, meal.label)
                 Timing.entries.forEach { timing ->
-                    val slot = Slot.of(meal, timing)
-                    val isOn = slot in selected
-                    FilterChip(
-                        selected = isOn,
-                        onClick = { onToggle(slot) },
-                        label = { Text(SlotTimes.scheduledTime(today, slot, planned).hm()) },
-                        leadingIcon = if (isOn) {
-                            { Icon(Icons.Filled.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }
-                        } else {
-                            null
-                        },
-                        modifier = Modifier.weight(1f),
-                    )
+                    SlotChip(Slot.of(meal, timing), selected, settings, today, onToggle, Modifier.weight(1f))
                 }
             }
         }
     }
+}
+
+@Composable
+private fun EveningRow(selected: Set<Slot>, settings: NudgeSettings, today: LocalDate, onToggle: (Slot) -> Unit) {
+    Row(
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+    ) {
+        RowLabel("Evening", "Any food")
+        SlotChip(Slot.EVENING, selected, settings, today, onToggle, Modifier.weight(1f))
+    }
+}
+
+@Composable
+private fun RowLabel(title: String, subtitle: String) {
+    Column(Modifier.width(76.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall)
+        Text(
+            subtitle,
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun SlotChip(
+    slot: Slot,
+    selected: Set<Slot>,
+    settings: NudgeSettings,
+    today: LocalDate,
+    onToggle: (Slot) -> Unit,
+    modifier: Modifier,
+) {
+    val isOn = slot in selected
+    FilterChip(
+        selected = isOn,
+        onClick = { onToggle(slot) },
+        label = { Text(SlotTimes.scheduledTime(today, slot, settings).hm()) },
+        leadingIcon = if (isOn) {
+            { Icon(Icons.Filled.Check, null, Modifier.size(FilterChipDefaults.IconSize)) }
+        } else {
+            null
+        },
+        modifier = modifier,
+    )
 }

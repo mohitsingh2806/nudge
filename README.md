@@ -1,8 +1,8 @@
 # Nudge — Medicine Reminder (Android)
 
-Reminders built around **meals**, not clock times. Each medicine goes in one or more of 6 slots
-(Morning / Noon / Night × Before / After food). Change your breakfast time once and every morning
-reminder moves with it.
+Reminders built around **meals**, not clock times. Each medicine goes in one or more of 7 slots
+(Morning / Noon / Night × Before / After food, plus **Evening** at its own time between lunch and
+dinner). Change your breakfast time once and every morning reminder moves with it.
 
 ## Build & run (on the PC with Android Studio)
 1. Clone the repo, then **File → Open** the project folder in Android Studio (Ladybug 2024.2+ or newer).
@@ -18,10 +18,9 @@ Unit tests: `./gradlew test` (once the wrapper is added) or right-click `app/src
 ## Features
 - **Today**: big "NOW / NEXT" card with one **Taken all** button, plus the full day's timeline with
   per-medicine ✓ / ✕ (tap a status chip to undo).
-- **I just ate** (button in reminder notifications): moves the after-food reminder to *now + offset*. If you never tap it, the after-food
-  reminder still fires at the planned meal time + offset.
-- **Reminders**: notification with *Taken all / Snooze / I just ate*. Repeats every 10 min until you act;
-  after 60 min the doses are marked **Missed**. Survives reboot, app update and clock changes.
+- **Reminders**: notification with *Taken all / Snooze / Skip*. Repeats every 10 min until you act; the
+  last one says so, and after 60 min the doses are marked **Missed** with a final "Missed" notification
+  (its *I took them* button fixes it if you did take them). Survives reboot, app update and clock changes.
 - **Home-screen widget**: next slot, its medicines and a Taken all button.
 - **History**: monthly calendar (green / amber / red) and per-day details.
 - **Settings**: meal times (default 9:00 / 12:30 / 20:00), before (30 min) / after (15 min) offsets,

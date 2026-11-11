@@ -4,7 +4,6 @@ import com.mohit.nudge.data.Meal
 import com.mohit.nudge.data.NudgeSettings
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.data.Timing
-import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
 import java.time.ZonedDateTime
@@ -16,15 +15,14 @@ object SlotTimes {
         meal: Meal,
         s: NudgeSettings,
         zone: ZoneId = ZoneId.systemDefault(),
-    ): ZonedDateTime {
-        val m = s.mealMinute(meal)
-        return date.atTime(m / 60, m % 60).atZone(zone)
-    }
+    ): ZonedDateTime = atMinute(date, s.mealMinute(meal), zone)
+
+    private fun atMinute(date: LocalDate, minuteOfDay: Int, zone: ZoneId): ZonedDateTime =
+        date.atTime(minuteOfDay / 60, minuteOfDay % 60).atZone(zone)
 
     /**
      * When the reminder for [slot] on [date] should fire.
-     * Before food = meal - beforeOffset.
-     * After food  = (time user tapped "I just ate" today, else planned meal time) + afterOffset.
+     * Before food = meal - beforeOffset. After food = meal + afterOffset. Evening = its own time.
      */
     fun scheduledTime(
         date: LocalDate,
@@ -32,14 +30,11 @@ object SlotTimes {
         s: NudgeSettings,
         zone: ZoneId = ZoneId.systemDefault(),
     ): ZonedDateTime {
-        val meal = mealTime(date, slot.meal, s, zone)
+        val meal = slot.meal ?: return atMinute(date, s.eveningMin, zone)
+        val mealAt = mealTime(date, meal, s, zone)
         return when (slot.timing) {
-            Timing.BEFORE -> meal.minusMinutes(s.beforeOffsetMin.toLong())
-            Timing.AFTER -> {
-                val ate = s.ateAt[slot.meal]?.let { Instant.ofEpochMilli(it).atZone(zone) }
-                val base = if (ate != null && ate.toLocalDate() == date) ate else meal
-                base.plusMinutes(s.afterOffsetMin.toLong())
-            }
+            Timing.BEFORE -> mealAt.minusMinutes(s.beforeOffsetMin.toLong())
+            else -> mealAt.plusMinutes(s.afterOffsetMin.toLong())
         }
     }
 }

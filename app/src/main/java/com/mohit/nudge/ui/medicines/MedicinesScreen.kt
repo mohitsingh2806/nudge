@@ -134,7 +134,7 @@ fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
                     )
                 }
             }
-            Slot.entries.forEach { slot ->
+            Slot.displayOrder.forEach { slot ->
                 val inSlot = meds.filter { slot in it.slots() }
                 if (inSlot.isNotEmpty()) {
                     item(key = "header_${slot.name}") {
