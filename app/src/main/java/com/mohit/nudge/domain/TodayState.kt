@@ -8,10 +8,16 @@ import com.mohit.nudge.data.Slot
 import java.time.LocalDate
 import java.time.ZonedDateTime
 
-data class SlotDose(val medicine: Medicine, val status: DoseStatus?)
+data class SlotDose(
+    val medicine: Medicine,
+    val status: DoseStatus?,
+    /** This slot today is the final dose of the medicine's course. */
+    val isLastDose: Boolean = false,
+)
 
 data class SlotState(val slot: Slot, val time: ZonedDateTime, val doses: List<SlotDose>) {
     val pending: List<Medicine> get() = doses.filter { it.status == null }.map { it.medicine }
+    val lastDoseIds: Set<Long> get() = doses.filter { it.isLastDose }.map { it.medicine.id }.toSet()
     val isDone: Boolean get() = pending.isEmpty()
 }
 
@@ -48,7 +54,9 @@ fun buildToday(
             SlotState(
                 slot = slot,
                 time = SlotTimes.scheduledTime(date, slot, settings),
-                doses = due.map { SlotDose(it, logMap[slot to it.id]?.status) },
+                doses = due.map {
+                    SlotDose(it, logMap[slot to it.id]?.status, it.isLastDose(day, slot, settings))
+                },
             )
         }
     }.sortedBy { it.time } // Evening's time is user-set, so order by the actual time of day.

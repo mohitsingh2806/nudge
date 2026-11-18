@@ -85,17 +85,29 @@ object Notifier {
         snoozeMin: Int,
         /** Minutes until the slot is marked missed, when this is the final reminder; else null. */
         lastReminderMin: Long? = null,
+        /** Medicines in [meds] whose course ends with this dose. */
+        lastDoseIds: Set<Long> = emptySet(),
     ) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) return
 
-        val lines = meds.map { m ->
+        // Last doses first, so they're visible even when the notification is collapsed.
+        val sorted = meds.sortedByDescending { it.id in lastDoseIds }
+        val lines = sorted.map { m ->
             val base = if (m.dose.isBlank()) m.name else "${m.name} — ${m.dose}"
-            if (m.repeatType() == RepeatType.DAILY) base else "$base (${m.repeatText().lowercase()})"
+            val withRepeat = if (m.repeatType() == RepeatType.DAILY) base else "$base (${m.repeatText().lowercase()})"
+            if (m.id in lastDoseIds) "$withRepeat · LAST DOSE" else withRepeat
         }
-        val title = "${slot.label} · ${meds.size} medicine" + if (meds.size == 1) "" else "s"
+        val lastCount = meds.count { it.id in lastDoseIds }
+        val lastText = when {
+            lastCount == 0 -> ""
+            meds.size == 1 -> " · last dose"
+            lastCount == 1 -> " · 1 last dose"
+            else -> " · $lastCount last doses"
+        }
+        val title = "${slot.label} · ${meds.size} medicine" + (if (meds.size == 1) "" else "s") + lastText
 
         val open = PendingIntent.getActivity(
             context, 0,

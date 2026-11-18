@@ -98,9 +98,11 @@ private fun WidgetContent(state: TodayState) {
                 style = TextStyle(color = white, fontSize = 18.sp, fontWeight = FontWeight.Bold),
             )
             Spacer(GlanceModifier.height(4.dp))
-            hero.pending.take(3).forEach { med ->
+            val lastDoseIds = hero.lastDoseIds
+            hero.pending.sortedByDescending { it.id in lastDoseIds }.take(3).forEach { med ->
+                val base = if (med.dose.isBlank()) med.name else "${med.name} · ${med.dose}"
                 Text(
-                    "• " + if (med.dose.isBlank()) med.name else "${med.name} · ${med.dose}",
+                    "• " + if (med.id in lastDoseIds) "$base · last dose" else base,
                     style = TextStyle(color = white, fontSize = 14.sp),
                     maxLines = 1,
                 )

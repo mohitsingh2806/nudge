@@ -28,6 +28,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
@@ -186,12 +187,16 @@ private fun HeroCard(st: SlotState, isNow: Boolean, onTakenAll: () -> Unit, onSk
             )
             Text(st.slot.label, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(12.dp))
-            st.pending.forEach { med ->
+            val lastDoseIds = st.lastDoseIds
+            st.pending.sortedByDescending { it.id in lastDoseIds }.forEach { med ->
                 Row(Modifier.padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                     ColorDot(med.color, 18.dp)
                     Spacer(Modifier.width(12.dp))
                     Column {
-                        Text(med.name, style = MaterialTheme.typography.titleMedium)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(med.name, style = MaterialTheme.typography.titleMedium, modifier = Modifier.weight(1f, fill = false))
+                            if (med.id in lastDoseIds) LastDoseTag()
+                        }
                         val sub = med.subtitle()
                         if (sub.isNotBlank()) {
                             Text(sub, style = MaterialTheme.typography.bodyMedium)
@@ -260,11 +265,15 @@ private fun DoseLine(d: SlotDose, onSetDose: (Long, DoseStatus?) -> Unit) {
         ColorDot(d.medicine.color)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
-            Text(
-                d.medicine.name,
-                style = MaterialTheme.typography.bodyLarge,
-                textDecoration = if (d.status == DoseStatus.TAKEN) TextDecoration.LineThrough else null,
-            )
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(
+                    d.medicine.name,
+                    style = MaterialTheme.typography.bodyLarge,
+                    modifier = Modifier.weight(1f, fill = false),
+                    textDecoration = if (d.status == DoseStatus.TAKEN) TextDecoration.LineThrough else null,
+                )
+                if (d.isLastDose) LastDoseTag()
+            }
             val sub = d.medicine.subtitle()
             if (sub.isNotBlank()) {
                 Text(
@@ -286,5 +295,23 @@ private fun DoseLine(d: SlotDose, onSetDose: (Long, DoseStatus?) -> Unit) {
             // Tap the chip to undo.
             AssistChip(onClick = { onSetDose(d.medicine.id, null) }, label = { Text(statusLabel(status)) })
         }
+    }
+}
+
+/** Small label next to a medicine name when this is the final dose of its course. */
+@Composable
+private fun LastDoseTag() {
+    Surface(
+        color = MaterialTheme.colorScheme.tertiaryContainer,
+        contentColor = MaterialTheme.colorScheme.onTertiaryContainer,
+        shape = MaterialTheme.shapes.small,
+        modifier = Modifier.padding(start = 8.dp),
+    ) {
+        Text(
+            "Last dose",
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            modifier = Modifier.padding(horizontal = 6.dp, vertical = 2.dp),
+        )
     }
 }

@@ -8,6 +8,7 @@ import com.mohit.nudge.container
 import com.mohit.nudge.data.DoseStatus
 import com.mohit.nudge.data.Slot
 import com.mohit.nudge.domain.headsUpItems
+import com.mohit.nudge.domain.isLastDose
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 
@@ -68,7 +69,8 @@ class AlarmReceiver : BroadcastReceiver() {
                 // The next follow-up (or snooze) will land past the give-up time, so say so now.
                 val minutesLeft = s.giveUpMin - elapsedMin
                 val lastReminder = if (minutesLeft <= s.renotifyMin) minutesLeft else null
-                Notifier.show(context, slot, day, slotTime, pending, s.renotifyMin, lastReminder)
+                val lastDoseIds = pending.filter { it.isLastDose(day, slot, s) }.map { it.id }.toSet()
+                Notifier.show(context, slot, day, slotTime, pending, s.renotifyMin, lastReminder, lastDoseIds)
                 c.scheduler.scheduleRenotify(slot, day, slotTime, s.renotifyMin)
             }
         }
