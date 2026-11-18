@@ -8,6 +8,8 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write # publish releases
     env:
       NUDGE_KEYSTORE_PASSWORD: ${{ secrets.NUDGE_KEYSTORE_PASSWORD }}
       NUDGE_KEY_ALIAS: ${{ secrets.NUDGE_KEY_ALIAS }}
@@ -54,3 +56,16 @@ jobs:
         with:
           name: nudge-debug-apk
           path: app/build/outputs/apk/debug/*.apk
+
+      # Each push to main becomes a release with the APK attached as "nudge.apk", so
+      # /releases/latest/download/nudge.apk always points at the newest build (no sign-in needed).
+      - name: Publish release
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/*.apk "$RUNNER_TEMP/nudge.apk"
+          git log -1 --format=%B > "$RUNNER_TEMP/notes.md"
+          TAG="build-${{ github.run_number }}"
+          TITLE="Build ${{ github.run_number }} · $(git log -1 --format=%s)"
+          gh release create "$TAG" "$RUNNER_TEMP/nudge.apk" --target "$GITHUB_SHA" --title "$TITLE" --notes-file "$RUNNER_TEMP/notes.md" --latest
