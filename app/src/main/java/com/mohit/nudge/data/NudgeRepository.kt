@@ -81,6 +81,19 @@ class NudgeRepository(
         onDataChanged()
     }
 
+    /**
+     * "Restart course": a new copy of the medicine starting today with the same dose, slots,
+     * repeat and duration. The finished one is hidden but kept, so its past course stays in History
+     * (editing its start date instead would erase that course from History).
+     */
+    suspend fun restartCourse(id: Long) {
+        val old = medDao.get(id) ?: return
+        val today = LocalDate.now().toEpochDay()
+        medDao.insert(old.copy(id = 0, startEpochDay = today, archivedEpochDay = null))
+        medDao.update(old.copy(archivedEpochDay = today))
+        onDataChanged()
+    }
+
     /** Medicines due in [slot] on [day] that have no Taken/Skipped/Missed entry yet. */
     suspend fun pendingMeds(day: Long, slot: Slot): List<Medicine> {
         val logged = logDao.getDay(day).filter { it.slot == slot }.map { it.medicineId }.toSet()

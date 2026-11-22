@@ -22,6 +22,9 @@ Unit tests: `./gradlew test` (once the wrapper is added) or right-click `app/src
   last one says so, and after 60 min the doses are marked **Missed** with a final "Missed" notification
   (its *I took them* button fixes it if you did take them). Survives reboot, app update and clock changes.
 - **Home-screen widget**: next slot, its medicines and a Taken all button.
+- **Finished courses**: when a fixed-length course ends, the medicine moves to a collapsed *Finished*
+  section at the bottom of the medicines list. Tap one to **Restart course** (a fresh copy from today, so
+  the old course stays in History) or **Remove** it.
 - **History**: monthly calendar (green / amber / red) and per-day details.
 - **Settings**: meal times (default 9:00 / 12:30 / 20:00), before (30 min) / after (15 min) offsets,
   repeat interval, give-up time.

@@ -64,4 +64,32 @@ class MedicineRepeatTest {
         assertEquals(start.plusDays(2).toEpochDay(), m.nextDueDay(start.plusDays(1).toEpochDay()))
         assertEquals(null, med(interval = 2, duration = 3).nextDueDay(start.plusDays(3).toEpochDay()))
     }
+
+    private fun day(offset: Int) = start.plusDays(offset.toLong()).toEpochDay()
+
+    @Test
+    fun finishedOnlyAfterTheLastDoseDay() {
+        val m = med(duration = 5) // due days 0..4
+        assertEquals(day(4), m.lastDueDay())
+        assertFalse(m.isFinished(day(0)))
+        assertFalse(m.isFinished(day(4))) // last dose is today: still current
+        assertTrue(m.isFinished(day(5)))
+        assertTrue(m.isFinished(day(30)))
+    }
+
+    @Test
+    fun alternateDaysFinishAfterLastActualDose() {
+        val m = med(interval = 2, duration = 6) // due days 0, 2, 4
+        assertEquals(day(4), m.lastDueDay())
+        assertFalse(m.isFinished(day(4)))
+        assertTrue(m.isFinished(day(5)))
+    }
+
+    @Test
+    fun ongoingFutureAndDeletedAreNeverFinished() {
+        assertFalse(med().isFinished(day(100)))
+        assertEquals(null, med().lastDueDay())
+        assertFalse(med(duration = 3).isFinished(day(-1))) // not started yet
+        assertFalse(med(duration = 3).copy(archivedEpochDay = day(10)).isFinished(day(20)))
+    }
 }

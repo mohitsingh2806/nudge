@@ -2,10 +2,13 @@ package com.mohit.nudge.ui.medicines
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
@@ -15,6 +18,8 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.Delete
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExtendedFloatingActionButton
@@ -33,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -59,6 +65,12 @@ fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
     val meds by repo.activeMedicines.collectAsStateWithLifecycle(initialValue = emptyList())
     val scope = rememberCoroutineScope()
     val haptics = LocalHapticFeedback.current
+
+    // Finished courses go to a collapsed section at the bottom instead of mixing with current ones.
+    val today = LocalDate.now().toEpochDay()
+    val (finished, current) = meds.partition { it.isFinished(today) }
+    var showFinished by rememberSaveable { mutableStateOf(false) }
+    var finishedChoice by remember { mutableStateOf<Medicine?>(null) }
 
     // Long-press selection (medicine ids).
     var selected by remember { mutableStateOf(setOf<Long>()) }
@@ -135,7 +147,7 @@ fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
                 }
             }
             Slot.displayOrder.forEach { slot ->
-                val inSlot = meds.filter { slot in it.slots() }
+                val inSlot = current.filter { slot in it.slots() }
                 if (inSlot.isNotEmpty()) {
                     item(key = "header_${slot.name}") {
                         Text(
@@ -148,6 +160,7 @@ fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
                     items(inSlot, key = { "${slot.name}_${it.id}" }) { med ->
                         MedicineRow(
                             med = med,
+                            subtitle = listOf(med.dose, med.scheduleText()).filter { it.isNotBlank() }.joinToString(" · "),
                             isSelected = med.id in selected,
                             onClick = { if (selecting) toggle(med.id) else onEdit(med.id) },
                             onLongClick = {
@@ -158,7 +171,84 @@ fun MedicinesScreen(onEdit: (Long) -> Unit, onImport: () -> Unit) {
                     }
                 }
             }
+            if (current.isEmpty()) {
+                item(key = "no_current") {
+                    Text(
+                        "No current medicines. Tap Add, or restart a finished course below.",
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(16.dp),
+                    )
+                }
+            }
+            if (finished.isNotEmpty()) {
+                item(key = "finished_header") {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showFinished = !showFinished }
+                            .padding(start = 16.dp, end = 12.dp, top = 20.dp, bottom = 8.dp),
+                    ) {
+                        Text(
+                            "Finished (${finished.size})",
+                            style = MaterialTheme.typography.titleSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.weight(1f),
+                        )
+                        Icon(
+                            if (showFinished) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown,
+                            contentDescription = if (showFinished) "Hide finished" else "Show finished",
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
+                }
+                if (showFinished) {
+                    items(finished.sortedByDescending { it.lastDueDay() ?: it.startEpochDay }, key = { "finished_${it.id}" }) { med ->
+                        MedicineRow(
+                            med = med,
+                            subtitle = listOf(med.dose, med.finishedText()).filter { it.isNotBlank() }.joinToString(" · "),
+                            isSelected = med.id in selected,
+                            onClick = { if (selecting) toggle(med.id) else finishedChoice = med },
+                            onLongClick = {
+                                haptics.performHapticFeedback(HapticFeedbackType.LongPress)
+                                toggle(med.id)
+                            },
+                        )
+                    }
+                }
+            }
         }
+    }
+
+    finishedChoice?.let { med ->
+        val days = med.durationDays ?: 0
+        AlertDialog(
+            onDismissRequest = { finishedChoice = null },
+            title = { Text(med.name) },
+            text = {
+                Text(
+                    "${med.finishedText()}.\n\n" +
+                        "Restart course: take it again from today for $days day${if (days == 1) "" else "s"}, " +
+                        "same dose and times.\n" +
+                        "Remove: hide it from this list. History is kept either way.",
+                )
+            },
+            confirmButton = {
+                TextButton(onClick = {
+                    finishedChoice = null
+                    scope.launch { repo.restartCourse(med.id) }
+                }) { Text("Restart course") }
+            },
+            dismissButton = {
+                Row {
+                    TextButton(onClick = {
+                        finishedChoice = null
+                        scope.launch { repo.archiveMedicine(med.id) }
+                    }) { Text("Remove") }
+                    TextButton(onClick = { finishedChoice = null }) { Text("Cancel") }
+                }
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -207,9 +297,21 @@ private fun Medicine.scheduleText(): String {
     return "${repeatText()} · $next · $span"
 }
 
+/** e.g. "Finished 12 Nov" (the day of the last dose). */
+private fun Medicine.finishedText(): String {
+    val last = lastDueDay() ?: (startEpochDay + (durationDays ?: 1) - 1)
+    return "Finished ${LocalDate.ofEpochDay(last).format(DateFormat)}"
+}
+
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun MedicineRow(med: Medicine, isSelected: Boolean, onClick: () -> Unit, onLongClick: () -> Unit) {
+private fun MedicineRow(
+    med: Medicine,
+    subtitle: String,
+    isSelected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     ListItem(
         modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
         colors = if (isSelected) {
@@ -230,8 +332,6 @@ private fun MedicineRow(med: Medicine, isSelected: Boolean, onClick: () -> Unit,
             }
         },
         headlineContent = { Text(med.name) },
-        supportingContent = {
-            Text(listOf(med.dose, med.scheduleText()).filter { it.isNotBlank() }.joinToString(" · "))
-        },
+        supportingContent = { Text(subtitle) },
     )
 }

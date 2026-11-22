@@ -58,6 +58,19 @@ data class Medicine(
     /** First day on or after [fromDay] this medicine is due, or null if it has ended. */
     fun nextDueDay(fromDay: Long): Long? = (fromDay..fromDay + 400).firstOrNull { isDueOn(it) }
 
+    /**
+     * The course is over: it has a set duration and no dose is due on [today] or later.
+     * A medicine whose last dose is today is not finished until tomorrow.
+     */
+    fun isFinished(today: Long): Boolean =
+        durationDays != null && archivedEpochDay == null && startEpochDay <= today && nextDueDay(today) == null
+
+    /** Last day a dose of this course was due, or null for ongoing medicines or if none ever was. */
+    fun lastDueDay(): Long? {
+        val duration = durationDays ?: return null
+        return (startEpochDay + duration - 1 downTo startEpochDay).firstOrNull { isDueOn(it) }
+    }
+
     /** e.g. "Every day", "Alternate days", "Mon, Thu". */
     fun repeatText(): String = when (repeatType()) {
         RepeatType.DAILY -> "Every day"
